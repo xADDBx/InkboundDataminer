@@ -2,15 +2,25 @@ Uses Doorstep to inject a C# dll into Inkbound and dump some information.
 Inkbound directory:
 
 Inkbound/
+
 ├── Miner/
+
 │   ├── InkboundDataminer.dll 	(Put here by you)
+
 ├── doorstop_config.ini			(Put here by you)
+
 ├── winhttp.dll					(Put here by you)
+
 ├── UnityPlayer.dll
+
 ├── UnityCrashHandler64.exe
+
 ├── Inkbound.exe
+
 ├── MonoBleedingEdge/
+
 ├── Inkbound_Data/
+
 └── Inkbound_BurstDebugInformation_DoNotShip/
 
 
