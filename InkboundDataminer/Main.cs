@@ -1,12 +1,14 @@
-﻿using Newtonsoft.Json;
+﻿using InkboundDataminer;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using ShinyShoe;
-using ShinyShoe.Ares.Networking;
-using ShinyShoe.Ares.SharedSOs;
+using ShinyShoe.Ares;
 using ShinyShoe.SharedDataLoader;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -22,56 +24,133 @@ namespace Doorstop {
             return (IList)Activator.CreateInstance(genericListType);
         }
         public static void runnable() {
-            var p = "InkboundDataminer" + Path.DirectorySeparatorChar;
+            var p = "Miner" + Path.DirectorySeparatorChar;
             error = new StreamWriter(p + "error.log");
             info = new StreamWriter(p + "info.log");
             try {
+                // Delaying stuff until game loads.
+                // Very elegant if I do say so myself.
                 int i = 0;
                 while (ClientApp.Inst?._applicationState?.AssetLibrary == null) {
-                    createFileAt(p + "startup.log", $"Is null 1.{i}!");
+                    createFileAt(p + "startup.log", $"Waiting for game to start 1.{i}!");
                     i++;
                     Thread.Sleep(500);
                 }
                 var assetLib = ClientApp.Inst._applicationState.AssetLibrary;
-                GlobalGameData data;
                 i = 0;
                 while (true) {
                     try {
-                        data = assetLib.GetOrLoadGlobalGameData();
+                        assetLib.GetOrLoadGlobalGameData();
                         break;
                     } catch {
-                        createFileAt(p + "startup.log", $"Is null 2.{i}!");
+                        createFileAt(p + "startup.log", $"Waiting for game to start 2.{i}!");
                         i++;
                         Thread.Sleep(500);
                     }
                 }
-                var settings = new JsonSerializerSettings() {
-                    _referenceLoopHandling = ReferenceLoopHandling.Ignore
-                };
-                string json;
-                var pa = p + "Client" + Path.DirectorySeparatorChar;
-                assetLib = new AssetLibraryClientStandalone();
-                assetLib.Initialize();
-                assetLib.LoadAll();
-                dumpAssetLib(pa, assetLib);
-                pa = p + "Server" + Path.DirectorySeparatorChar;
-                assetLib = new AssetLibraryServerDesktop();
-                assetLib.Initialize();
-                assetLib.LoadAll();
-                dumpAssetLib(pa, assetLib);
-                json = JsonConvert.SerializeObject(ClientApp.Inst?._applicationState.WorldClient, Formatting.Indented, settings);
-                createFileAt(p + "WorldClient.json", json);
-
+                // Game should've started most systems here
+                dumpWorldClient(p);
+                dumpAssetLibs(p);
+                info.WriteLine("Finished Dumping everything");
+                info.Flush();
             } catch (Exception e) {
                 error.Write(e.ToString());
                 error.WriteLine();
                 error.Flush();
             }
             error.Close();
+            info.Close();
+        }
+        public static void dumpWorldClient(string p) {
+            string pa = p + "WorldClient" + Path.DirectorySeparatorChar;
+            if (Directory.Exists(pa)) {
+                info.WriteLine("Skipped Dumping WorldClient as directory already exists");
+                info.Flush();
+                return;
+            }
+            info.WriteLine("Start Dumping WorldClient");
+            info.Flush();
+            string json;
+            var settings = new JsonSerializerSettings() {
+                _referenceLoopHandling = ReferenceLoopHandling.Ignore,
+                ContractResolver = new AllFieldsContractResolver(),
+                Converters = { new Vector3Converter() }
+            };
+            var wc = ClientApp.Inst?._applicationState.WorldClient;
+            json = JsonConvert.SerializeObject(wc, Formatting.Indented, settings);
+            createFileAt(pa + "WorldClient.json", json);
+            json = JsonConvert.SerializeObject(wc.worldEngine, Formatting.Indented, settings);
+            createFileAt(pa + "worldEngine.json", json);
+            json = JsonConvert.SerializeObject(wc.navigation, Formatting.Indented, settings);
+            createFileAt(pa + "navigation.json", json);
+            json = JsonConvert.SerializeObject(wc.localEntHandle, Formatting.Indented, settings);
+            createFileAt(pa + "localEntHandle.json", json);
+            json = JsonConvert.SerializeObject(wc.serverWorldStateChanges, Formatting.Indented, settings);
+            createFileAt(pa + "serverWorldStateChanges.json", json);
+            json = JsonConvert.SerializeObject(wc.mostRecentInputStateAckByClient, Formatting.Indented, settings);
+            createFileAt(pa + "mostRecentInputStateAckByClient.json", json);
+            json = JsonConvert.SerializeObject(wc.mostRecentWorldStateFrameAckByClient, Formatting.Indented, settings);
+            createFileAt(pa + "mostRecentWorldStateFrameAckByClient.json", json);
+            json = JsonConvert.SerializeObject(wc.previousPredictedWorldState, Formatting.Indented, settings);
+            createFileAt(pa + "previousPredictedWorldState.json", json);
+            dumpWorldState(pa, wc.mostRecentProcessedServerWorldState, nameof(wc.mostRecentProcessedServerWorldState), settings);
+            dumpWorldState(pa, wc.predictedWorldState, nameof(wc.predictedWorldState), settings);
+
+            info.WriteLine("Finished Dumping WorldClient");
+            info.Flush();
+        }
+        public static void dumpWorldState(string pa, WorldState ws, string name, JsonSerializerSettings settings) {
+            pa += name + Path.DirectorySeparatorChar;
+            foreach (var system in ws.GetSystems()) {
+                string json = JsonConvert.SerializeObject(system, Formatting.Indented, settings);
+                createFileAt(pa + system.ToString() + ".json", json);
+            }
+        }
+        public static void dumpAssetLibs(string p) {
+            info.WriteLine("Start Dumping ClientStandalone AssetLib");
+            info.Flush();
+            var pa = p + "C" + Path.DirectorySeparatorChar;
+            AssetLibrary assetLib = new AssetLibraryClientStandalone();
+            assetLib.Initialize();
+            assetLib.LoadAll();
+            dumpAssetLib(pa, assetLib);
+            info.WriteLine("Finished Dumping ClientStandalone AssetLib");
+            /*
+            info.WriteLine("Start Dumping ServerDesktop AssetLib");
+            info.Flush();
+            pa = p + "D" + Path.DirectorySeparatorChar;
+            assetLib = new AssetLibraryServerDesktop();
+            assetLib.Initialize();
+            assetLib.LoadAll();
+            dumpAssetLib(pa, assetLib);
+            info.WriteLine("Finished Dumping ServerDesktop AssetLib");
+            info.WriteLine("Start Dumping Editor AssetLib");
+            info.Flush();
+            pa = p + "E" + Path.DirectorySeparatorChar;
+            assetLib = new AssetLibraryEditor();
+            assetLib.Initialize();
+            assetLib.LoadAll();
+            dumpAssetLib(pa, assetLib);
+            info.WriteLine("Finished Dumping Editor AssetLib");
+            info.WriteLine("Start Dumping ServerCloud AssetLib");
+            info.Flush();
+            pa = p + "C" + Path.DirectorySeparatorChar;
+            assetLib = new AssetLibraryServerCloud();
+            assetLib.Initialize();
+            assetLib.LoadAll();
+            dumpAssetLib(pa, assetLib);
+            info.WriteLine("Finished Dumping ServerCloud AssetLib");
+            */
+            info.Flush();
         }
         public static void dumpAssetLib(string pa, AssetLibrary assetLib, bool shortDump = true) {
+            if (shortDump) {
+                createFileAt(pa + "!!ShortDump.txt", "This dump is created with shortDump set to true, so all Graphs are skipped");
+            }
             var settings = new JsonSerializerSettings() {
-                _referenceLoopHandling = ReferenceLoopHandling.Ignore
+                _referenceLoopHandling = ReferenceLoopHandling.Ignore,
+                // If I uncomment this to also serialize private fields it'll crash at any items after "StageMutatorListData\\CustomStageMutators/PrologueMutators.json"
+                // ContractResolver = new AllFieldsContractResolver()
             };
             string json;
             Dictionary<Type, List<object>> typeToList = new Dictionary<Type, List<object>>();
@@ -87,22 +166,21 @@ namespace Doorstop {
             }
             foreach (var type in typeToList.Keys) {
                 foreach (var item in typeToList[type]) {
+                    if (item == null) continue;
                     var path = $"{pa}{type}{Path.DirectorySeparatorChar}{itemToName[item]}.json".Replace("ShinyShoe.Ares.SharedSOs.", "");
-                    try {
-                        if (item == null) continue;
-                        if (shortDump) {
-                            if (File.Exists(path)) continue;
-                            if (path.EndsWith("Graph.json")) {
-                                json = "Short Dump is activated so Graphs are not dumped.";
-                                createFileAt(path, json);
-                                continue;
-                            }
+                    if (shortDump) {
+                        if (File.Exists(path)) continue;
+                        if (path.Contains("Graph") || path.Contains("Nodes")) {
+                            continue;
                         }
-                        json = JsonConvert.SerializeObject(Convert.ChangeType(item, type) ?? item, Formatting.Indented, settings);
+                    }
+                    try {
+                        json = JsonConvert.SerializeObject(item, type, Formatting.Indented, settings);
                         createFileAt(path, json);
                     } catch (Exception ex) {
                         if (path.Length > 259) {
                             error.WriteLine("Filename too long!");
+                            error.Flush();
                         }
                         error.Write(ex.ToString());
                         error.WriteLine();
@@ -113,6 +191,7 @@ namespace Doorstop {
         }
         public static void createFileAt(string path, string content) {
             info.WriteLine($"Creating file {path}");
+            info.Flush();
             if (File.Exists(path)) {
                 File.Delete(path);
             }
