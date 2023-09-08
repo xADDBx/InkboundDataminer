@@ -8,6 +8,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -17,10 +18,6 @@ namespace Doorstop {
         public static StreamWriter info;
         public static void Start() {
             Task.Run(runnable);
-        }
-        public static IList createList(Type myType) {
-            Type genericListType = typeof(List<>).MakeGenericType(myType);
-            return (IList)Activator.CreateInstance(genericListType);
         }
         public static void runnable() {
             var p = "Miner" + Path.DirectorySeparatorChar;
@@ -115,30 +112,9 @@ namespace Doorstop {
             dumpAssetLib(pa, assetLib);
             info.WriteLine("Finished Dumping ClientStandalone AssetLib");
             /*
-            info.WriteLine("Start Dumping ServerDesktop AssetLib");
-            info.Flush();
-            pa = p + "D" + Path.DirectorySeparatorChar;
             assetLib = new AssetLibraryServerDesktop();
-            assetLib.Initialize();
-            assetLib.LoadAll();
-            dumpAssetLib(pa, assetLib);
-            info.WriteLine("Finished Dumping ServerDesktop AssetLib");
-            info.WriteLine("Start Dumping Editor AssetLib");
-            info.Flush();
-            pa = p + "E" + Path.DirectorySeparatorChar;
             assetLib = new AssetLibraryEditor();
-            assetLib.Initialize();
-            assetLib.LoadAll();
-            dumpAssetLib(pa, assetLib);
-            info.WriteLine("Finished Dumping Editor AssetLib");
-            info.WriteLine("Start Dumping ServerCloud AssetLib");
-            info.Flush();
-            pa = p + "C" + Path.DirectorySeparatorChar;
             assetLib = new AssetLibraryServerCloud();
-            assetLib.Initialize();
-            assetLib.LoadAll();
-            dumpAssetLib(pa, assetLib);
-            info.WriteLine("Finished Dumping ServerCloud AssetLib");
             */
             info.Flush();
         }
@@ -148,8 +124,9 @@ namespace Doorstop {
             }
             var settings = new JsonSerializerSettings() {
                 _referenceLoopHandling = ReferenceLoopHandling.Ignore,
-                // If I uncomment this to also serialize private fields it'll crash at any items after "StageMutatorListData\\CustomStageMutators/PrologueMutators.json"
-                // ContractResolver = new AllFieldsContractResolver()
+                ContractResolver = new DefaultContractResolver {
+                    DefaultMembersSearchFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
+                },
             };
             string json;
             Dictionary<Type, List<object>> typeToList = new Dictionary<Type, List<object>>();
@@ -181,9 +158,11 @@ namespace Doorstop {
                             error.WriteLine("Filename too long!");
                             error.Flush();
                         }
-                        error.Write(ex.ToString());
-                        error.WriteLine();
-                        error.Flush();
+                        if (!ex.ToString().Contains('UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationHandle')) {
+                            error.Write(ex.ToString());
+                            error.WriteLine();
+                            error.Flush();
+                        }
                     }
                 }
             }
@@ -199,6 +178,10 @@ namespace Doorstop {
             var wr = fi.CreateText();
             wr.Write(content);
             wr.Close();
+        }
+        public static IList createList(Type myType) {
+            Type genericListType = typeof(List<>).MakeGenericType(myType);
+            return (IList)Activator.CreateInstance(genericListType);
         }
     }
 }
