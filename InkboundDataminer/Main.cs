@@ -23,49 +23,77 @@ namespace Doorstop {
             var p = "Miner" + Path.DirectorySeparatorChar;
             error = new StreamWriter(p + "error.log");
             info = new StreamWriter(p + "info.log");
+            error.AutoFlush = true;
+            info.AutoFlush = true;
             try {
                 // Delaying stuff until game loads.
                 // Very elegant if I do say so myself.
-                int i = 0;
                 while (ClientApp.Inst?._applicationState?.AssetLibrary == null) {
-                    createFileAt(p + "startup.log", $"Waiting for game to start 1.{i}!");
-                    i++;
                     Thread.Sleep(500);
                 }
                 var assetLib = ClientApp.Inst._applicationState.AssetLibrary;
-                i = 0;
                 while (true) {
                     try {
                         assetLib.GetOrLoadGlobalGameData();
                         break;
                     } catch {
-                        createFileAt(p + "startup.log", $"Waiting for game to start 2.{i}!");
-                        i++;
                         Thread.Sleep(500);
                     }
                 }
                 // Game should've started most systems here
-                dumpWorldClient(p);
-                dumpAssetLibs(p);
+                dumpSeasonRewards(assetLib);
+                //dumpWorldClient(p);
+                //dumpAssetLibs(p);
                 info.WriteLine("Finished Dumping everything");
-                info.Flush();
             } catch (Exception e) {
                 error.Write(e.ToString());
                 error.WriteLine();
-                error.Flush();
             }
             error.Close();
             info.Close();
+        }
+        public static void dumpSeasonRewards(AssetLibrary assetLib) {
+            foreach (var season in SeasonHelper.GetAllSeasonDatas(assetLib)) {
+                info.WriteLine("-----------------------------------");
+                info.WriteLine(season.Name);
+                info.WriteLine("-----------------------------------");
+                info.WriteLine("Victory Board Rewards");
+                void dumpSeasonReward(ShinyShoe.Ares.SharedSOs.SeasonRewardData r) {
+                    if (r == null) return;
+                    var whitespace = "        ";
+                    var currencyPrefix = (r.premiumCurrencyCode == 2001) ? "Shinies" : $"Currency {r.premiumCurrencyCode}";
+                    if (r.currencyAmount > 0)
+                        info.WriteLine(whitespace + currencyPrefix + r.currencyAmount);
+                    if (r.cosmeticData != null)
+                        info.WriteLine(whitespace + r.cosmeticData);
+                    if (r.cosmeticBundleData != null)
+                        info.WriteLine(whitespace + r.cosmeticBundleData);
+                    if (r.trinketCurrencyAmount > 0)
+                        info.WriteLine(whitespace + r.trinketCurrencyAmount);
+                    if (r.equipmentData != null)
+                        info.WriteLine(whitespace + r.equipmentData);
+                }
+                foreach (var reward in season.seasonAchievementRewardListData.seasonRewardsForAchievementLevel) {
+                    info.WriteLine($"{reward.level}: ");
+                    dumpSeasonReward(reward.reward);
+                }
+                info.WriteLine("Battlepass Rewards");
+                foreach (var reward in season.seasonRewardListData.seasonRewardsForLevel) {
+                    info.WriteLine($"{reward.level}: ");
+                    info.WriteLine("Free:");
+                    dumpSeasonReward(reward.freeReward);
+                    info.WriteLine("Premium:");
+                    dumpSeasonReward(reward.premiumReward);
+                }
+            }
         }
         public static void dumpWorldClient(string p) {
             string pa = p + "WorldClient" + Path.DirectorySeparatorChar;
             if (Directory.Exists(pa)) {
                 info.WriteLine("Skipped Dumping WorldClient as directory already exists");
-                info.Flush();
                 return;
             }
             info.WriteLine("Start Dumping WorldClient");
-            info.Flush();
             string json;
             var settings = new JsonSerializerSettings() {
                 _referenceLoopHandling = ReferenceLoopHandling.Ignore,
@@ -93,7 +121,6 @@ namespace Doorstop {
             dumpWorldState(pa, wc.predictedWorldState, nameof(wc.predictedWorldState), settings);
 
             info.WriteLine("Finished Dumping WorldClient");
-            info.Flush();
         }
         public static void dumpWorldState(string pa, WorldState ws, string name, JsonSerializerSettings settings) {
             pa += name + Path.DirectorySeparatorChar;
@@ -104,7 +131,6 @@ namespace Doorstop {
         }
         public static void dumpAssetLibs(string p) {
             info.WriteLine("Start Dumping ClientStandalone AssetLib");
-            info.Flush();
             var pa = p + "C" + Path.DirectorySeparatorChar;
             AssetLibrary assetLib = new AssetLibraryClientStandalone();
             assetLib.Initialize();
@@ -116,7 +142,6 @@ namespace Doorstop {
             assetLib = new AssetLibraryEditor();
             assetLib = new AssetLibraryServerCloud();
             */
-            info.Flush();
         }
         public static void dumpAssetLib(string pa, AssetLibrary assetLib, bool shortDump = true) {
             if (shortDump) {
@@ -154,7 +179,6 @@ namespace Doorstop {
                     } catch (Exception ex) {
                         if (path.Length > 259) {
                             error.WriteLine("Filename too long!");
-                            error.Flush();
                         }
                         //if (!ex.ToString().Contains("UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationHandle")) {
                         error.Write(ex.ToString());
@@ -167,7 +191,6 @@ namespace Doorstop {
         }
         public static void createFileAt(string path, string content) {
             info.WriteLine($"Creating file {path}");
-            info.Flush();
             if (File.Exists(path)) {
                 File.Delete(path);
             }
