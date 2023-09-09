@@ -70,8 +70,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AllFieldsContractResolver.cs" />
-    <Compile Include="JsonConverters.cs" />
     <Compile Include="Main.cs" />
   </ItemGroup>
   <ItemGroup>
