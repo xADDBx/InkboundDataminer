@@ -124,9 +124,7 @@ namespace Doorstop {
             }
             var settings = new JsonSerializerSettings() {
                 _referenceLoopHandling = ReferenceLoopHandling.Ignore,
-                ContractResolver = new DefaultContractResolver {
-                    DefaultMembersSearchFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
-                },
+                ContractResolver = new AllFieldsContractResolver()
             };
             string json;
             Dictionary<Type, List<object>> typeToList = new Dictionary<Type, List<object>>();
@@ -158,11 +156,11 @@ namespace Doorstop {
                             error.WriteLine("Filename too long!");
                             error.Flush();
                         }
-                        if (!ex.ToString().Contains('UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationHandle')) {
-                            error.Write(ex.ToString());
-                            error.WriteLine();
-                            error.Flush();
-                        }
+                        //if (!ex.ToString().Contains("UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationHandle")) {
+                        error.Write(ex.ToString());
+                        error.WriteLine();
+                        error.Flush();
+                        //}
                     }
                 }
             }

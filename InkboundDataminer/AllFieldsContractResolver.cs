@@ -8,7 +8,7 @@ using System.Reflection;
 namespace InkboundDataminer {
     public class AllFieldsContractResolver : DefaultContractResolver {
         public override IList<JsonProperty> CreateProperties(Type type, MemberSerialization memberSerialization) {
-            var props = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            var props = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Where(p => p.CanWrite && p.CanRead)
                             .Select(p => base.CreateProperty(p, memberSerialization))
                         .Union(type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                                    .Select(f => base.CreateProperty(f, memberSerialization)))
