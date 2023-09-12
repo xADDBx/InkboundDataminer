@@ -1,7 +1,4 @@
-﻿using InkboundDataminer;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
-using ShinyShoe;
+﻿using ShinyShoe;
 using ShinyShoe.Ares;
 using ShinyShoe.SharedDataLoader;
 using System;
@@ -16,16 +13,40 @@ namespace Doorstop {
     class Entrypoint {
         public static StreamWriter error;
         public static StreamWriter info;
-        public static void Start() {
-            Task.Run(runnable);
+        private static Assembly ResolveDependentAssembly(object sender, ResolveEventArgs args) {
+            if (args.RequestingAssembly.CodeBase.Contains("Miner")) {
+                // Blup
+            }
+            info.WriteLine(args.Name);
+            return Assembly.LoadFrom(args.Name);
         }
-        public static void runnable() {
+        public static void Main() {
+            AppDomain.CurrentDomain.AssemblyResolve += new ResolveEventHandler(ResolveDependentAssembly);
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies()) {
+                info.WriteLine(asm.CodeBase);
+            }
+            Task.Run(() => {
+                var ret = Task.Run(runnable);
+                ret.Wait();
+                error.WriteLine(ret.Exception.ToString());
+            });
+        }
+        public static void Start() {
             var p = "Miner" + Path.DirectorySeparatorChar;
             error = new StreamWriter(p + "error.log");
             info = new StreamWriter(p + "info.log");
             error.AutoFlush = true;
             info.AutoFlush = true;
             try {
+                Main();
+            } catch (Exception ex) {
+                error.WriteLine(ex.ToString());
+            }
+        }
+        public static void runnable() {
+            var p = "Miner" + Path.DirectorySeparatorChar;
+            try {
+                InkboundDataminer.Patches.Patch();
                 // Delaying stuff until game loads.
                 // Very elegant if I do say so myself.
                 while (ClientApp.Inst?._applicationState?.AssetLibrary == null) {
@@ -43,6 +64,7 @@ namespace Doorstop {
                 // Game should've started most systems here
                 dumpSeasonRewards(assetLib);
                 //dumpWorldClient(p);
+                dumpDifficulties();
                 //dumpAssetLibs(p);
                 info.WriteLine("Finished Dumping everything");
             } catch (Exception e) {
@@ -52,41 +74,90 @@ namespace Doorstop {
             error.Close();
             info.Close();
         }
+        public static void dumpDifficulties() {
+            ComponentsUtil.GetCompsFromPool<LoadWorldSystem.Components>(ClientApp.Inst._applicationState, out var comps);
+            var ggd = comps.globalGameData;
+
+            var difficultyLog = new StreamWriter("Miner" + Path.DirectorySeparatorChar + "difficulty.log");
+            difficultyLog.AutoFlush = true;
+            while (ggd.rankedDifficultyData.difficultyLevelData[3].TierNumber <= 0) {
+                info.WriteLine("Delay because difficulties are null");
+                Thread.Sleep(200);
+            }
+            difficultyLog.WriteLine("-----------------------------------");
+            difficultyLog.WriteLine("difficultyLevelData");
+            difficultyLog.WriteLine("-----------------------------------");
+            foreach (var tier in ggd.rankedDifficultyData.difficultyLevelData) {
+                difficultyLog.WriteLine(tier.name + ": " + tier.TierNumber);
+                difficultyLog.WriteLine("Mutators:");
+                var whitespace = "        ";
+                foreach (var mutator in tier.availableBookMutators.stageMutators) {
+                    difficultyLog.WriteLine(whitespace + $"{mutator.name}: {mutator.glyphsGainedOnSelection} Glyphs, {mutator.runCurrencyGainedOnSelection}");
+                }
+                difficultyLog.WriteLine(tier.ToString());
+                difficultyLog.WriteLine("-----------------------------------");
+            }
+            difficultyLog.WriteLine("-----------------------------------");
+            difficultyLog.WriteLine("difficultyScalingData");
+            difficultyLog.WriteLine("-----------------------------------");
+            foreach (var tier in ggd.rankedRunConfigurationData.difficultyScalingData) {
+                difficultyLog.WriteLine(tier.tier + ":");
+                foreach (var statusses in tier.statusEffectsToApplyToEnemies) {
+                    var whitespace = "        ";
+                    difficultyLog.WriteLine(whitespace + statusses.statusEffectData?.name);
+                }
+                difficultyLog.WriteLine(tier.ToString());
+                difficultyLog.WriteLine("-----------------------------------");
+            }
+        }
         public static void dumpSeasonRewards(AssetLibrary assetLib) {
+            var seasonLog = new StreamWriter("Miner" + Path.DirectorySeparatorChar + "season.log");
+            seasonLog.AutoFlush = true;
             foreach (var season in SeasonHelper.GetAllSeasonDatas(assetLib)) {
-                info.WriteLine("-----------------------------------");
-                info.WriteLine(season.Name);
-                info.WriteLine("-----------------------------------");
-                info.WriteLine("Victory Board Rewards");
+                seasonLog.WriteLine("-----------------------------------");
+                seasonLog.WriteLine(season.Name);
+                seasonLog.WriteLine("-----------------------------------");
+                seasonLog.WriteLine("Victory Board Rewards");
                 void dumpSeasonReward(ShinyShoe.Ares.SharedSOs.SeasonRewardData r) {
                     if (r == null) return;
                     var whitespace = "        ";
                     var currencyPrefix = (r.premiumCurrencyCode == 2001) ? "Shinies" : $"Currency {r.premiumCurrencyCode}";
                     if (r.currencyAmount > 0)
-                        info.WriteLine(whitespace + currencyPrefix + r.currencyAmount);
+                        seasonLog.WriteLine(whitespace + currencyPrefix + r.currencyAmount);
                     if (r.cosmeticData != null)
-                        info.WriteLine(whitespace + r.cosmeticData);
+                        seasonLog.WriteLine(whitespace + r.cosmeticData);
                     if (r.cosmeticBundleData != null)
-                        info.WriteLine(whitespace + r.cosmeticBundleData);
+                        seasonLog.WriteLine(whitespace + r.cosmeticBundleData);
                     if (r.trinketCurrencyAmount > 0)
-                        info.WriteLine(whitespace + r.trinketCurrencyAmount);
+                        seasonLog.WriteLine(whitespace + r.trinketCurrencyAmount);
                     if (r.equipmentData != null)
-                        info.WriteLine(whitespace + r.equipmentData);
+                        seasonLog.WriteLine(whitespace + r.equipmentData);
                 }
                 foreach (var reward in season.seasonAchievementRewardListData.seasonRewardsForAchievementLevel) {
-                    info.WriteLine($"{reward.level}: ");
+                    seasonLog.WriteLine($"Level: {reward.level}: ");
                     dumpSeasonReward(reward.reward);
                 }
-                info.WriteLine("Battlepass Rewards");
+                seasonLog.WriteLine("Battlepass Rewards");
                 foreach (var reward in season.seasonRewardListData.seasonRewardsForLevel) {
-                    info.WriteLine($"{reward.level}: ");
-                    info.WriteLine("Free:");
+                    seasonLog.WriteLine($"Level: {reward.level}: ");
+                    seasonLog.WriteLine("Free:");
                     dumpSeasonReward(reward.freeReward);
-                    info.WriteLine("Premium:");
+                    seasonLog.WriteLine("Premium:");
                     dumpSeasonReward(reward.premiumReward);
                 }
+                seasonLog.WriteLine("Progress Rewards");
+                var itemUnlockRewardListData = assetLib.GetOrLoadGlobalGameData().GetItemUnlockRewardListData();
+                ComponentsUtil.GetCompsFromPool<LogbookScreen.Components>(ClientApp.Inst._applicationState, out var comps);
+                for (int i = 0; i < itemUnlockRewardListData.ItemUnlockRewards.Count; i++) {
+                    var seasonItemUnlockRewardsForLevel = itemUnlockRewardListData.ItemUnlockRewards[i];
+                    var reward = seasonItemUnlockRewardsForLevel.GetReward();
+                    if (reward != null) {
+                        seasonLog.WriteLine($"Level: {seasonItemUnlockRewardsForLevel.levelUpCount}");
+                        dumpSeasonReward(reward);
+                    }
+                }
             }
-        }
+        }/*
         public static void dumpWorldClient(string p) {
             string pa = p + "WorldClient" + Path.DirectorySeparatorChar;
             if (Directory.Exists(pa)) {
@@ -96,7 +167,7 @@ namespace Doorstop {
             info.WriteLine("Start Dumping WorldClient");
             string json;
             var settings = new JsonSerializerSettings() {
-                _referenceLoopHandling = ReferenceLoopHandling.Ignore,
+                ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
                 ContractResolver = new AllFieldsContractResolver(),
                 Converters = { new Vector3Converter() }
             };
@@ -137,58 +208,53 @@ namespace Doorstop {
             assetLib.LoadAll();
             dumpAssetLib(pa, assetLib);
             info.WriteLine("Finished Dumping ClientStandalone AssetLib");
-            /*
-            assetLib = new AssetLibraryServerDesktop();
-            assetLib = new AssetLibraryEditor();
-            assetLib = new AssetLibraryServerCloud();
-            */
+    }
+    public static void dumpAssetLib(string pa, AssetLibrary assetLib, bool shortDump = true) {
+        if (shortDump) {
+            createFileAt(pa + "!!ShortDump.txt", "This dump is created with shortDump set to true, so all Graphs are skipped");
         }
-        public static void dumpAssetLib(string pa, AssetLibrary assetLib, bool shortDump = true) {
-            if (shortDump) {
-                createFileAt(pa + "!!ShortDump.txt", "This dump is created with shortDump set to true, so all Graphs are skipped");
+        var settings = new JsonSerializerSettings() {
+            ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
+            ContractResolver = new AllFieldsContractResolver()
+        };
+        string json;
+        Dictionary<Type, List<object>> typeToList = new Dictionary<Type, List<object>>();
+        Dictionary<object, string> itemToName = new Dictionary<object, string>();
+        foreach (var asset in assetLib._assetIDToEntry.Values) {
+            if (asset.asset == null) assetLib.LoadAsset(asset);
+            if (asset.asset == null) continue;
+            if (!typeToList.ContainsKey(asset.classType)) {
+                typeToList[asset.classType] = new List<object>();
             }
-            var settings = new JsonSerializerSettings() {
-                _referenceLoopHandling = ReferenceLoopHandling.Ignore,
-                ContractResolver = new AllFieldsContractResolver()
-            };
-            string json;
-            Dictionary<Type, List<object>> typeToList = new Dictionary<Type, List<object>>();
-            Dictionary<object, string> itemToName = new Dictionary<object, string>();
-            foreach (var asset in assetLib._assetIDToEntry.Values) {
-                if (asset.asset == null) assetLib.LoadAsset(asset);
-                if (asset.asset == null) continue;
-                if (!typeToList.ContainsKey(asset.classType)) {
-                    typeToList[asset.classType] = new List<object>();
+            typeToList[asset.classType].Add(asset.asset);
+            itemToName[asset.asset] = asset.name ?? asset.assetID._guid ?? asset.dataId;
+        }
+        foreach (var type in typeToList.Keys) {
+            foreach (var item in typeToList[type]) {
+                if (item == null) continue;
+                var path = $"{pa}{type}{Path.DirectorySeparatorChar}{itemToName[item]}.json".Replace("ShinyShoe.Ares.SharedSOs.", "");
+                if (shortDump) {
+                    if (File.Exists(path)) continue;
+                    if (path.Contains("Graph") || path.Contains("Nodes")) {
+                        continue;
+                    }
                 }
-                typeToList[asset.classType].Add(asset.asset);
-                itemToName[asset.asset] = asset.name ?? asset.assetID._guid ?? asset.dataId;
-            }
-            foreach (var type in typeToList.Keys) {
-                foreach (var item in typeToList[type]) {
-                    if (item == null) continue;
-                    var path = $"{pa}{type}{Path.DirectorySeparatorChar}{itemToName[item]}.json".Replace("ShinyShoe.Ares.SharedSOs.", "");
-                    if (shortDump) {
-                        if (File.Exists(path)) continue;
-                        if (path.Contains("Graph") || path.Contains("Nodes")) {
-                            continue;
-                        }
+                try {
+                    json = JsonConvert.SerializeObject(item, type, Formatting.Indented, settings);
+                    createFileAt(path, json);
+                } catch (Exception ex) {
+                    if (path.Length > 259) {
+                        error.WriteLine("Filename too long!");
                     }
-                    try {
-                        json = JsonConvert.SerializeObject(item, type, Formatting.Indented, settings);
-                        createFileAt(path, json);
-                    } catch (Exception ex) {
-                        if (path.Length > 259) {
-                            error.WriteLine("Filename too long!");
-                        }
-                        //if (!ex.ToString().Contains("UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationHandle")) {
-                        error.Write(ex.ToString());
-                        error.WriteLine();
-                        error.Flush();
-                        //}
-                    }
+                    //if (!ex.ToString().Contains("UnityEngine.ResourceManagement.AsyncOperations.AsyncOperationHandle")) {
+                    error.Write(ex.ToString());
+                    error.WriteLine();
+                    error.Flush();
+                    //}
                 }
             }
         }
+    }*/
         public static void createFileAt(string path, string content) {
             info.WriteLine($"Creating file {path}");
             if (File.Exists(path)) {
