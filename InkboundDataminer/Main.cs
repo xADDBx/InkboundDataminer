@@ -13,18 +13,7 @@ namespace Doorstop {
     class Entrypoint {
         public static StreamWriter error;
         public static StreamWriter info;
-        private static Assembly ResolveDependentAssembly(object sender, ResolveEventArgs args) {
-            if (args.RequestingAssembly.CodeBase.Contains("Miner")) {
-                // Blup
-            }
-            info.WriteLine(args.Name);
-            return Assembly.LoadFrom(args.Name);
-        }
         public static void Main() {
-            AppDomain.CurrentDomain.AssemblyResolve += new ResolveEventHandler(ResolveDependentAssembly);
-            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies()) {
-                info.WriteLine(asm.CodeBase);
-            }
             Task.Run(() => {
                 var ret = Task.Run(runnable);
                 ret.Wait();
@@ -47,7 +36,7 @@ namespace Doorstop {
             var p = "Miner" + Path.DirectorySeparatorChar;
             try {
                 InkboundDataminer.Patches.Patch();
-                // Delaying stuff until game loads.
+                /*// Delaying stuff until game loads.
                 // Very elegant if I do say so myself.
                 while (ClientApp.Inst?._applicationState?.AssetLibrary == null) {
                     Thread.Sleep(500);
@@ -65,7 +54,7 @@ namespace Doorstop {
                 dumpSeasonRewards(assetLib);
                 //dumpWorldClient(p);
                 dumpDifficulties();
-                //dumpAssetLibs(p);
+                //dumpAssetLibs(p);*/
                 info.WriteLine("Finished Dumping everything");
             } catch (Exception e) {
                 error.Write(e.ToString());
