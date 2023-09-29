@@ -28,14 +28,6 @@ namespace InkboundDataminer {
             }
         }
         */
-        [HarmonyPatch(typeof(MessagingSystem.State))]
-        public static class MessagingSystem_State_Patch {
-            [HarmonyPatch(nameof(MessagingSystem.State.SetChatChannelsToRestore))]
-            [HarmonyPrefix]
-            public static void SetChatChannelsToRestore() {
-                //Doorstop.Entrypoint.info.WriteLine("SetChatChannels!");
-            }
-        }
         [HarmonyPatch(typeof(UnityTlsContext))]
         public static class UnityTlsContext_Patch {
             [HarmonyPatch(nameof(UnityTlsContext.ProcessHandshake))]
