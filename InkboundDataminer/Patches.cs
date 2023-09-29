@@ -105,7 +105,6 @@ namespace InkboundDataminer {
         }
         public static void Patch() {
             try {
-                Harmony.DEBUG = true;
                 HarmonyInstance.PatchAll(Assembly.GetExecutingAssembly());
                 Doorstop.Entrypoint.info.WriteLine("Finished Patching!");
             } catch (Exception ex) {
