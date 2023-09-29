@@ -12,6 +12,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>InkboundDataminer</RootNamespace>
     <AssemblyName>InkboundDataminer</AssemblyName>
+	<LangVersion>8.0</LangVersion>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>false</Deterministic>
@@ -66,12 +67,19 @@
       <HintPath>$(SolutionDir)lib\Assembly-CSharp_public.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="System" />
+    <Reference Include="Mono.Security">
+      <HintPath>..\..\..\..\Games\Steam\steamapps\common\Inkbound\Inkbound_Data\Managed\Mono.Security.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
+    <Reference Include="System">
+      <HintPath>$(SolutionDir)lib\System_public.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="UnityEngine.CoreModule">
       <HintPath>$(InkboundInstallDir)\Inkbound_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
       <Private>False</Private>
@@ -84,6 +92,7 @@
   <ItemGroup>
     <PubliciseInputAssemblies Include="$(InkboundInstallDir)\Inkbound_Data\Managed\Assembly-CSharp.dll" />
     <PubliciseInputAssemblies Include="$(InkboundInstallDir)\Inkbound_Data\Managed\Newtonsoft.Json.dll" />
+    <PubliciseInputAssemblies Include="$(InkboundInstallDir)\Inkbound_Data\Managed\System.dll" />
   </ItemGroup>
   <Target Name="Publicise" AfterTargets="BeforeBuild;Clean" Inputs="@(PubliciseInputAssemblies)" Outputs="$(SolutionDir)lib\%(PubliciseInputAssemblies.FileName)_public.dll;$(SolutionDir)lib\ToyBox\%(PubliciseInputAssemblies.FileName)_public.hash">
     <MakeDir Directories="$(SolutionDir)lib/" />
