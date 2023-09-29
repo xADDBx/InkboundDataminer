@@ -63,6 +63,7 @@ namespace InkboundDataminer {
                     } else {
                         Debug.CheckAndThrow(unitytls_errorstate, unitytls_x509verify_result, "Handshake failed", AlertDescription.HandshakeFailure);
                     }
+                    file.Close();
                     __result = true;
                     return false;
                 }
@@ -100,6 +101,7 @@ namespace InkboundDataminer {
                         __instance.m_Socket.Dispose();
                     }
                 }
+                file.Close();
                 return false;
             }
         }
